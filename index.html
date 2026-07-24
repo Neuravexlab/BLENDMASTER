@@ -193,11 +193,12 @@
   table.tt-grid{
     border-collapse:collapse;
     width:100%;
-    min-width:720px;
+    min-width:900px;
   }
   table.tt-grid th, table.tt-grid td{
     border:1px solid var(--line);
     padding:0;
+    vertical-align:top;
   }
   table.tt-grid th{
     background:var(--gray-bg);
@@ -214,19 +215,49 @@
     width:40px;
     padding:6px 2px;
   }
-  table.tt-grid td input{
-    width:100%;
+  table.tt-grid td.tt-cell{
+    padding:6px;
+    min-width:118px;
+  }
+  .chip-list{
+    display:flex;
+    flex-wrap:wrap;
+    gap:3px;
+    margin-bottom:4px;
+    min-height:4px;
+  }
+  .chip.mini{
+    background:var(--teal-bg);
+    color:var(--teal);
+    border:1px solid #bfe4df;
+    border-radius:10px;
+    padding:2px 3px 2px 8px;
+    font-size:11px;
+    display:inline-flex;
+    align-items:center;
+    gap:1px;
+    max-width:100%;
+  }
+  .chip.mini .chip-label{cursor:pointer;}
+  .chip.mini .chip-label:hover{text-decoration:underline;}
+  .chip.mini .chip-x{
+    background:none;
     border:none;
-    border-radius:0;
-    padding:8px 6px;
+    color:var(--teal);
     font-size:12px;
-    background:transparent;
+    padding:0 4px;
+    cursor:pointer;
   }
-  table.tt-grid td input:focus{
-    outline:2px solid var(--navy-light);
-    outline-offset:-2px;
-    background:#fff;
+  .chip.mini .chip-x:hover{background:rgba(0,0,0,.06);border-radius:50%;}
+  .chip-input{
+    width:100%;
+    border:1px dashed var(--line);
+    border-radius:6px;
+    font-size:11px;
+    padding:3px 5px;
+    background:#fbfbfc;
   }
+  .chip-input:focus{outline:none;border-color:var(--navy-light);}
 
   .grid-actions{
     margin-top:10px;
@@ -532,7 +563,17 @@ function renderSetupBanner(){
   }
 }
 
-/* ---------------- timetable grid ---------------- */
+/* ---------------- timetable grid (chip-editable cells) ---------------- */
+function cellTokens(wd, p){
+  const raw = (timetable[wd] && timetable[wd][p]) ? timetable[wd][p] : '';
+  return raw.split(',').map(s => s.trim()).filter(Boolean);
+}
+
+function setCellTokens(wd, p, tokens){
+  if(!timetable[wd]) timetable[wd] = {};
+  timetable[wd][p] = tokens.join(', ');
+}
+
 function renderGrid(){
   const container = document.getElementById('gridContainer');
   let html = '<table class="tt-grid"><thead><tr><th>時限</th>';
@@ -541,19 +582,65 @@ function renderGrid(){
   for(let p=1; p<=maxPeriod; p++){
     html += `<tr><td class="period-label">${p}</td>`;
     WEEKDAYS.forEach(wd=>{
-      const val = (timetable[wd] && timetable[wd][p]) ? timetable[wd][p] : '';
-      html += `<td><input type="text" data-wd="${wd}" data-p="${p}" value="${escapeHtml(val)}" placeholder="－"></td>`;
+      const tokens = cellTokens(wd, p);
+      html += `<td class="tt-cell" data-wd="${wd}" data-p="${p}">`;
+      html += `<div class="chip-list">`;
+      tokens.forEach((tok, i)=>{
+        html += `<span class="chip mini" data-tok-i="${i}"><span class="chip-label">${escapeHtml(tok)}</span><button class="chip-x" data-tok-i="${i}">×</button></span>`;
+      });
+      html += `</div>`;
+      html += `<input type="text" class="chip-input" placeholder="＋クラス名 Enter">`;
+      html += `</td>`;
     });
     html += '</tr>';
   }
   html += '</tbody></table>';
   container.innerHTML = html;
-  container.querySelectorAll('input').forEach(inp=>{
-    inp.addEventListener('change', e=>{
-      const wd = e.target.dataset.wd, p = e.target.dataset.p;
-      if(!timetable[wd]) timetable[wd] = {};
-      timetable[wd][p] = e.target.value;
-      saveTimetable();
+  attachGridListeners();
+}
+
+function attachGridListeners(){
+  document.querySelectorAll('td.tt-cell').forEach(td=>{
+    const wd = td.dataset.wd, p = td.dataset.p;
+
+    td.querySelectorAll('.chip-label').forEach(lbl=>{
+      lbl.addEventListener('click', ()=>{
+        const i = +lbl.parentElement.dataset.tokI;
+        const tokens = cellTokens(wd, p);
+        const next = prompt('クラス名を変更', tokens[i]);
+        if(next && next.trim()){
+          tokens[i] = next.trim();
+          setCellTokens(wd, p, tokens);
+          saveTimetable();
+          renderGrid();
+        }
+      });
+    });
+
+    td.querySelectorAll('.chip-x').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        const i = +btn.dataset.tokI;
+        const tokens = cellTokens(wd, p);
+        tokens.splice(i, 1);
+        setCellTokens(wd, p, tokens);
+        saveTimetable();
+        renderGrid();
+      });
+    });
+
+    const input = td.querySelector('.chip-input');
+    input.addEventListener('keydown', e=>{
+      if(e.key === 'Enter'){
+        e.preventDefault();
+        const v = e.target.value.trim();
+        if(v){
+          const tokens = cellTokens(wd, p);
+          tokens.push(v);
+          setCellTokens(wd, p, tokens);
+          saveTimetable();
+          renderGrid();
+        }
+      }
     });
   });
 }
@@ -772,6 +859,32 @@ function extractHRKeys(text){
   return keys;
 }
 
+// loose normalization: strip common noise characters so different naming
+// conventions ("3年A組" / "高3-A" / "A組") can still be compared as strings
+function normalizeLoose(s){
+  return toHalfWidth(s || '').replace(/[年組高－\-\s]/g, '').toLowerCase();
+}
+
+// OR-based match between one raw class label and one candidate label —
+// true if EITHER the grade+letter key overlaps OR one string loosely
+// contains the other. Does not require an exact match.
+function looseMatchSingle(a, b){
+  if(!a || !b) return false;
+  const ak = extractHRKeys(a), bk = extractHRKeys(b);
+  for(const k of ak) if(bk.has(k)) return true;
+  const an = normalizeLoose(a), bn = normalizeLoose(b);
+  if(an && bn && (an.includes(bn) || bn.includes(an))) return true;
+  return false;
+}
+
+// a timetable cell can hold several comma-separated class labels —
+// match if ANY of them loosely matches the BLEND label (OR judgment)
+function looseMatchCell(cellText, hrRaw){
+  if(!cellText || !hrRaw) return false;
+  const tokens = cellText.split(',').map(t => t.trim()).filter(Boolean);
+  return tokens.some(tok => looseMatchSingle(tok, hrRaw));
+}
+
 function parseUnfilledText(text){
   const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
   const linkRe = /^\[([^\]]+)\]\((https?:\/\/[^\)]+)\)$/;
@@ -801,18 +914,12 @@ function parseUnfilledText(text){
 }
 
 function checkEntries(entries){
-  const homeroomKeys = new Set();
-  homeroomClasses.forEach(raw => extractHRKeys(raw).forEach(k => homeroomKeys.add(k)));
-
   return entries.map(e=>{
-    const entryKeys = extractHRKeys(e.hrRaw);
     let isOwnClass = false;
     if(e.weekday && e.periodNum && timetable[e.weekday] && timetable[e.weekday][e.periodNum]){
-      const cellKeys = extractHRKeys(timetable[e.weekday][e.periodNum]);
-      for(const k of entryKeys) if(cellKeys.has(k)) isOwnClass = true;
+      isOwnClass = looseMatchCell(timetable[e.weekday][e.periodNum], e.hrRaw);
     }
-    let isHomeroom = false;
-    for(const k of entryKeys) if(homeroomKeys.has(k)) isHomeroom = true;
+    const isHomeroom = homeroomClasses.some(hc => looseMatchSingle(hc, e.hrRaw));
     return Object.assign({}, e, {isOwnClass, isHomeroom});
   });
 }
