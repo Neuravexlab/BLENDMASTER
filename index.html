@@ -238,8 +238,10 @@
     gap:1px;
     max-width:100%;
   }
-  .chip.mini .chip-label{cursor:pointer;}
-  .chip.mini .chip-label:hover{text-decoration:underline;}
+  .chip.mini .chip-label{cursor:pointer; display:inline-flex; flex-direction:column; line-height:1.25;}
+  .chip.mini .chip-label:hover .chip-name{text-decoration:underline;}
+  .chip.mini .chip-name{font-weight:600;}
+  .chip.mini .chip-subject{font-size:9.5px; opacity:.75; font-weight:400;}
   .chip.mini .chip-x{
     background:none;
     border:none;
@@ -564,6 +566,17 @@ function renderSetupBanner(){
 }
 
 /* ---------------- timetable grid (chip-editable cells) ---------------- */
+// each token is stored as "クラス名（科目名）" — subject is optional
+function parseToken(str){
+  const m = String(str).match(/^(.*?)(?:[（(]\s*(.*?)\s*[）)])?$/);
+  return { name: (m[1] || '').trim(), subject: (m[2] || '').trim() };
+}
+function formatToken(name, subject){
+  name = (name || '').trim();
+  subject = (subject || '').trim();
+  return subject ? `${name}（${subject}）` : name;
+}
+
 function cellTokens(wd, p){
   const raw = (timetable[wd] && timetable[wd][p]) ? timetable[wd][p] : '';
   return raw.split(',').map(s => s.trim()).filter(Boolean);
@@ -586,10 +599,16 @@ function renderGrid(){
       html += `<td class="tt-cell" data-wd="${wd}" data-p="${p}">`;
       html += `<div class="chip-list">`;
       tokens.forEach((tok, i)=>{
-        html += `<span class="chip mini" data-tok-i="${i}"><span class="chip-label">${escapeHtml(tok)}</span><button class="chip-x" data-tok-i="${i}">×</button></span>`;
+        const {name, subject} = parseToken(tok);
+        html += `<span class="chip mini" data-tok-i="${i}">`
+              + `<span class="chip-label">`
+              + `<span class="chip-name">${escapeHtml(name)}</span>`
+              + (subject ? `<span class="chip-subject">${escapeHtml(subject)}</span>` : '')
+              + `</span>`
+              + `<button class="chip-x" data-tok-i="${i}">×</button></span>`;
       });
       html += `</div>`;
-      html += `<input type="text" class="chip-input" placeholder="＋クラス名 Enter">`;
+      html += `<input type="text" class="chip-input" placeholder="＋クラス名（科目）">`;
       html += `</td>`;
     });
     html += '</tr>';
@@ -607,7 +626,7 @@ function attachGridListeners(){
       lbl.addEventListener('click', ()=>{
         const i = +lbl.parentElement.dataset.tokI;
         const tokens = cellTokens(wd, p);
-        const next = prompt('クラス名を変更', tokens[i]);
+        const next = prompt('クラス名を変更（例: 3年A組（数学Ⅱ）)', tokens[i]);
         if(next && next.trim()){
           tokens[i] = next.trim();
           setCellTokens(wd, p, tokens);
@@ -756,20 +775,20 @@ function setStatus(id, msg, kind){
 
 const VISION_PROMPT = `あなたは画像認識アシスタントです。添付画像は高校教員の個人授業時間割のスクリーンショットです。
 表は左端に時限番号（1,2,3…）の行、上部に曜日（月・火・水・木・金・土・日のいずれか表示されているもの）の列があります。
-各セルには0個以上の「担当クラス（HR名）」が含まれます。1セルに複数クラスが含まれる場合（合同授業・学年集会・講堂など）もあります。
+各セルには0個以上の「担当クラス（HR名）」と、それぞれに対応する「科目名」が含まれます。1セルに複数クラスが含まれる場合（合同授業・学年集会・講堂など）もあります。
 
 タスク：
-・各曜日×各時限のセルについて、そこに表示されているクラス名（HR名）だけを抽出してください。
+・各曜日×各時限のセルについて、そこに表示されている「クラス名（HR名）」と「科目名」の組を抽出してください。
 ・クラス名の例：「高２－Ｈ」「3年A組」「Ｈ組」など、学年+組を示す文字列。
-・科目名（数学Ⅱ、英ＣⅠなど）は無視してください。
+・科目名の例：「数学Ⅱ」「英ＣⅠ」「日探/世探」など。判読できない・存在しない場合は空文字にしてください。
 ・会議名など生徒のクラスを表していないセルは空配列にしてください。
-・1セルに複数クラスがある場合は全てを配列に含めてください。
+・1セルに複数クラスがある場合は全ての組を配列に含めてください。
 
 出力は下記の厳密なJSON形式のみとし、説明文やコードブロック記号は一切含めないでください：
-{"曜日":{"時限番号":["クラス名1","クラス名2"], ...}, ...}
+{"曜日":{"時限番号":[{"class":"クラス名","subject":"科目名"}, ...], ...}, ...}
 
 例：
-{"月":{"1":["高2-H"],"2":["高2-H"]},"金":{"1":["高1-K","高1-L","高1-M","高2-J","高2-K"]}}`;
+{"月":{"1":[{"class":"高2-H","subject":"数学Ⅱ"}]},"金":{"1":[{"class":"高1-K","subject":""},{"class":"高1-L","subject":""}]}}`;
 
 async function callGeminiVision(base64, mediaType){
   const res = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent', {
@@ -806,8 +825,16 @@ function mergeIntoTimetable(parsed){
     Object.keys(parsed[wd]).forEach(p=>{
       const arr = parsed[wd][p];
       if(Array.isArray(arr) && arr.length){
-        timetable[wd][p] = arr.join(', ');
-        maxPeriod = Math.max(maxPeriod, parseInt(p, 10) || 0);
+        const tokens = arr.map(item=>{
+          if(typeof item === 'string') return item.trim(); // backward compat with older format
+          const cls = (item && item.class) ? item.class.trim() : '';
+          const subj = (item && item.subject) ? item.subject.trim() : '';
+          return formatToken(cls, subj);
+        }).filter(Boolean);
+        if(tokens.length){
+          timetable[wd][p] = tokens.join(', ');
+          maxPeriod = Math.max(maxPeriod, parseInt(p, 10) || 0);
+        }
       }
     });
   });
@@ -877,12 +904,13 @@ function looseMatchSingle(a, b){
   return false;
 }
 
-// a timetable cell can hold several comma-separated class labels —
-// match if ANY of them loosely matches the BLEND label (OR judgment)
+// a timetable cell can hold several comma-separated "クラス名（科目名）" tokens —
+// match if ANY of the class-name portions loosely matches the BLEND label
+// (subject text is ignored for matching purposes)
 function looseMatchCell(cellText, hrRaw){
   if(!cellText || !hrRaw) return false;
   const tokens = cellText.split(',').map(t => t.trim()).filter(Boolean);
-  return tokens.some(tok => looseMatchSingle(tok, hrRaw));
+  return tokens.some(tok => looseMatchSingle(parseToken(tok).name, hrRaw));
 }
 
 function parseUnfilledText(text){
