@@ -1,0 +1,735 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>未入力チェッカー</title>
+<style>
+  :root{
+    --navy:#1c2740;
+    --navy-light:#2c3a5c;
+    --paper:#f5f6f8;
+    --card:#ffffff;
+    --line:#e2e5ea;
+    --text:#242a35;
+    --sub:#6b7280;
+    --teal:#0f766e;
+    --teal-bg:#e6f4f2;
+    --gold:#92660c;
+    --gold-bg:#fbf1dc;
+    --gray-bg:#f0f1f3;
+    --danger:#b3261e;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--paper);
+    color:var(--text);
+    font-family:"Hiragino Sans","Hiragino Kaku Gothic ProN","Yu Gothic","Meiryo",sans-serif;
+    line-height:1.6;
+    font-size:14px;
+  }
+  header{
+    background:var(--navy);
+    color:#fff;
+    padding:22px 24px 20px;
+  }
+  header h1{
+    margin:0 0 4px;
+    font-size:19px;
+    font-weight:700;
+    letter-spacing:.02em;
+  }
+  header p{
+    margin:0;
+    font-size:12.5px;
+    color:#b9c2d6;
+  }
+  .steps{
+    display:flex;
+    gap:8px;
+    margin-top:12px;
+    flex-wrap:wrap;
+  }
+  .steps span{
+    background:rgba(255,255,255,.1);
+    border:1px solid rgba(255,255,255,.18);
+    border-radius:20px;
+    padding:4px 12px;
+    font-size:11.5px;
+    color:#dbe2f0;
+  }
+  main{
+    max-width:980px;
+    margin:0 auto;
+    padding:20px 16px 60px;
+  }
+  .card{
+    background:var(--card);
+    border:1px solid var(--line);
+    border-radius:12px;
+    padding:20px 20px 22px;
+    margin-bottom:18px;
+  }
+  .card h2{
+    font-size:15px;
+    margin:0 0 4px;
+    display:flex;
+    align-items:center;
+    gap:8px;
+  }
+  .card h2 .badge{
+    background:var(--navy);
+    color:#fff;
+    border-radius:6px;
+    width:20px;height:20px;
+    display:inline-flex;align-items:center;justify-content:center;
+    font-size:11px;
+    flex:none;
+  }
+  .card .desc{
+    font-size:12.5px;
+    color:var(--sub);
+    margin:0 0 14px;
+  }
+  .row{
+    display:flex;
+    gap:10px;
+    flex-wrap:wrap;
+    align-items:center;
+  }
+  input[type=text], textarea{
+    font-family:inherit;
+    font-size:13px;
+    border:1px solid var(--line);
+    border-radius:7px;
+    padding:8px 10px;
+    background:#fbfbfc;
+    color:var(--text);
+  }
+  textarea{
+    width:100%;
+    resize:vertical;
+    min-height:120px;
+  }
+  button{
+    font-family:inherit;
+    font-size:13px;
+    font-weight:600;
+    border:none;
+    border-radius:7px;
+    padding:9px 16px;
+    cursor:pointer;
+    background:var(--navy);
+    color:#fff;
+    transition:background .15s;
+  }
+  button:hover{background:var(--navy-light);}
+  button.ghost{
+    background:transparent;
+    color:var(--navy);
+    border:1px solid var(--line);
+  }
+  button.ghost:hover{background:var(--gray-bg);}
+  button.small{
+    padding:5px 10px;
+    font-size:12px;
+  }
+  input[type=file]{
+    font-size:12.5px;
+  }
+  #analyzeStatus{
+    font-size:12.5px;
+    margin-top:8px;
+    min-height:16px;
+  }
+  #analyzeStatus.ok{color:var(--teal);}
+  #analyzeStatus.warn{color:var(--gold);}
+  #analyzeStatus.err{color:var(--danger);}
+  #analyzeStatus.loading{color:var(--sub);}
+
+  .grid-wrap{
+    overflow-x:auto;
+    margin-top:14px;
+    border:1px solid var(--line);
+    border-radius:8px;
+  }
+  table.tt-grid{
+    border-collapse:collapse;
+    width:100%;
+    min-width:720px;
+  }
+  table.tt-grid th, table.tt-grid td{
+    border:1px solid var(--line);
+    padding:0;
+  }
+  table.tt-grid th{
+    background:var(--gray-bg);
+    font-size:12px;
+    padding:8px 4px;
+    color:var(--sub);
+    font-weight:600;
+  }
+  table.tt-grid td.period-label{
+    background:var(--gray-bg);
+    text-align:center;
+    font-size:12px;
+    color:var(--sub);
+    width:40px;
+    padding:6px 2px;
+  }
+  table.tt-grid td input{
+    width:100%;
+    border:none;
+    border-radius:0;
+    padding:8px 6px;
+    font-size:12px;
+    background:transparent;
+  }
+  table.tt-grid td input:focus{
+    outline:2px solid var(--navy-light);
+    outline-offset:-2px;
+    background:#fff;
+  }
+
+  .grid-actions{
+    margin-top:10px;
+    display:flex;
+    gap:8px;
+  }
+
+  .tags{
+    display:flex;
+    flex-wrap:wrap;
+    gap:6px;
+    margin-bottom:10px;
+  }
+  .tag{
+    background:var(--gold-bg);
+    color:var(--gold);
+    border:1px solid #ecdcae;
+    border-radius:16px;
+    padding:4px 6px 4px 12px;
+    font-size:12.5px;
+    display:inline-flex;
+    align-items:center;
+    gap:6px;
+  }
+  .tag button{
+    background:none;
+    color:var(--gold);
+    padding:0 6px;
+    font-size:14px;
+    line-height:1;
+  }
+  .tag button:hover{background:rgba(0,0,0,.05);}
+
+  .summary{
+    display:flex;
+    gap:12px;
+    flex-wrap:wrap;
+    margin:14px 0 18px;
+  }
+  .summary .box{
+    flex:1;
+    min-width:140px;
+    border-radius:10px;
+    padding:12px 14px;
+    border:1px solid var(--line);
+  }
+  .summary .box.own{background:var(--teal-bg); border-color:#bfe4df;}
+  .summary .box.hr{background:var(--gold-bg); border-color:#ecdcae;}
+  .summary .box.total{background:var(--gray-bg);}
+  .summary .box .num{font-size:24px;font-weight:700;}
+  .summary .box.own .num{color:var(--teal);}
+  .summary .box.hr .num{color:var(--gold);}
+  .summary .box .label{font-size:12px;color:var(--sub);margin-top:2px;}
+
+  .list-section h3{
+    font-size:13.5px;
+    margin:18px 0 8px;
+    display:flex;
+    align-items:center;
+    gap:8px;
+  }
+  .list-section h3 .dot{
+    width:9px;height:9px;border-radius:50%;
+  }
+  .dot.own{background:var(--teal);}
+  .dot.hr{background:var(--gold);}
+  .dot.other{background:var(--sub);}
+
+  ul.entry-list{list-style:none;margin:0;padding:0;}
+  ul.entry-list li{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    padding:9px 10px;
+    border:1px solid var(--line);
+    border-radius:8px;
+    margin-bottom:6px;
+    font-size:12.8px;
+    flex-wrap:wrap;
+  }
+  ul.entry-list li .date{
+    font-weight:600;
+    min-width:86px;
+    color:var(--navy);
+  }
+  ul.entry-list li .period{
+    color:var(--sub);
+    min-width:44px;
+  }
+  ul.entry-list li .hrname{
+    font-weight:600;
+  }
+  ul.entry-list li .course{
+    color:var(--sub);
+    flex:1;
+    min-width:100px;
+  }
+  ul.entry-list li a{
+    color:var(--navy-light);
+    text-decoration:none;
+    font-size:12px;
+    white-space:nowrap;
+  }
+  ul.entry-list li a:hover{text-decoration:underline;}
+  .badge-both{
+    background:var(--navy);
+    color:#fff;
+    font-size:10.5px;
+    padding:2px 6px;
+    border-radius:4px;
+  }
+  .empty{
+    color:var(--sub);
+    font-size:12.5px;
+    padding:10px 0;
+  }
+  details summary{
+    cursor:pointer;
+    font-size:12.5px;
+    color:var(--sub);
+    margin-top:14px;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>未入力チェッカー</h1>
+  <p>自分の時間割 × BLEND出欠未登録一覧 を突き合わせて、自分の授業分と担任クラス分を抽出します。</p>
+  <div class="steps">
+    <span>① 時間割を登録</span>
+    <span>② 担任クラスを設定</span>
+    <span>③ BLENDの一覧を貼り付けてチェック</span>
+  </div>
+</header>
+
+<main>
+
+  <div class="card">
+    <h2><span class="badge">1</span>自分の時間割</h2>
+    <p class="desc">時間割のスクリーンショットをアップロードすると自動で読み取ります。読み取り後は表を直接クリックして修正できます（複数クラスがある場合はカンマ区切りで入力）。</p>
+
+    <div class="row">
+      <input type="file" id="fileInput" accept="image/*" multiple>
+      <button id="analyzeBtn">画像を解析して反映</button>
+    </div>
+    <div id="analyzeStatus"></div>
+
+    <div class="grid-wrap">
+      <div id="gridContainer"></div>
+    </div>
+    <div class="grid-actions">
+      <button class="ghost small" id="addRowBtn">＋ 時限を追加</button>
+      <button class="ghost small" id="clearGridBtn">時間割をクリア</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2><span class="badge">2</span>担任クラス</h2>
+    <p class="desc">担任しているクラス名を登録してください（例: 3年A組）。ここに登録したクラスは、時限に関係なく「担任クラスの未入力」として抽出されます。</p>
+    <div class="tags" id="hrTags"></div>
+    <div class="row">
+      <input type="text" id="hrInput" placeholder="クラス名を入力してEnter（例: 3年A組）" style="min-width:240px;">
+      <button class="ghost small" id="clearHrBtn">全てクリア</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2><span class="badge">3</span>未入力リストをチェック</h2>
+    <p class="desc">BLENDの「出欠未登録」一覧をそのままコピーして貼り付けてください（リンク付きのテキストのままでOK）。</p>
+    <textarea id="pasteArea" placeholder="7月21日
+3限
+[3年A組](https://blend.school/admin/attendance/homeroom/153619?date=20260721)
+内部スーパー文理探究β
+…"></textarea>
+    <div class="row" style="margin-top:10px;">
+      <button id="checkBtn">チェックする</button>
+    </div>
+
+    <div id="results"></div>
+  </div>
+
+</main>
+
+<script>
+const WEEKDAYS = ['月','火','水','木','金','土','日'];
+const WD_FROM_JSDAY = ['日','月','火','水','木','金','土'];
+const STORAGE_TT = 'timetable-grid';
+const STORAGE_HR = 'homeroom-classes';
+
+let timetable = {};      // { "月": { "1": "高2-H, 高1-K" }, ... }
+let homeroomClasses = [];// ["3年A組", ...]
+let maxPeriod = 8;
+
+function escapeHtml(s){
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+/* ---------- persistence ---------- */
+async function loadState(){
+  try{
+    const r = await window.storage.get(STORAGE_TT, false);
+    if(r && r.value){
+      const parsed = JSON.parse(r.value);
+      timetable = parsed.timetable || {};
+      maxPeriod = parsed.maxPeriod || 8;
+    }
+  }catch(e){ timetable = {}; }
+  try{
+    const r2 = await window.storage.get(STORAGE_HR, false);
+    if(r2 && r2.value) homeroomClasses = JSON.parse(r2.value);
+  }catch(e){ homeroomClasses = []; }
+  renderGrid();
+  renderTags();
+}
+
+async function saveTimetable(){
+  try{
+    await window.storage.set(STORAGE_TT, JSON.stringify({timetable, maxPeriod}), false);
+  }catch(e){ console.error('save timetable failed', e); }
+}
+async function saveHomeroom(){
+  try{
+    await window.storage.set(STORAGE_HR, JSON.stringify(homeroomClasses), false);
+  }catch(e){ console.error('save homeroom failed', e); }
+}
+
+/* ---------- grid rendering ---------- */
+function renderGrid(){
+  const container = document.getElementById('gridContainer');
+  let html = '<table class="tt-grid"><thead><tr><th>時限</th>';
+  WEEKDAYS.forEach(wd => html += `<th>${wd}</th>`);
+  html += '</tr></thead><tbody>';
+  for(let p=1; p<=maxPeriod; p++){
+    html += `<tr><td class="period-label">${p}</td>`;
+    WEEKDAYS.forEach(wd=>{
+      const val = (timetable[wd] && timetable[wd][p]) ? timetable[wd][p] : '';
+      html += `<td><input type="text" data-wd="${wd}" data-p="${p}" value="${escapeHtml(val)}" placeholder="－"></td>`;
+    });
+    html += '</tr>';
+  }
+  html += '</tbody></table>';
+  container.innerHTML = html;
+  container.querySelectorAll('input').forEach(inp=>{
+    inp.addEventListener('change', e=>{
+      const wd = e.target.dataset.wd, p = e.target.dataset.p;
+      if(!timetable[wd]) timetable[wd] = {};
+      timetable[wd][p] = e.target.value;
+      saveTimetable();
+    });
+  });
+}
+
+document.getElementById('addRowBtn').addEventListener('click', ()=>{
+  maxPeriod += 1;
+  renderGrid();
+  saveTimetable();
+});
+
+document.getElementById('clearGridBtn').addEventListener('click', ()=>{
+  if(!confirm('時間割の内容を全て消去します。よろしいですか？')) return;
+  timetable = {};
+  maxPeriod = 8;
+  renderGrid();
+  saveTimetable();
+});
+
+/* ---------- homeroom tag rendering ---------- */
+function renderTags(){
+  const c = document.getElementById('hrTags');
+  if(!homeroomClasses.length){
+    c.innerHTML = '<span class="empty">まだ登録されていません</span>';
+    return;
+  }
+  c.innerHTML = homeroomClasses.map((name,i)=>
+    `<span class="tag">${escapeHtml(name)}<button data-i="${i}">×</button></span>`
+  ).join('');
+  c.querySelectorAll('button').forEach(btn=>{
+    btn.addEventListener('click', e=>{
+      const i = +e.target.dataset.i;
+      homeroomClasses.splice(i,1);
+      renderTags();
+      saveHomeroom();
+    });
+  });
+}
+
+document.getElementById('hrInput').addEventListener('keydown', e=>{
+  if(e.key === 'Enter'){
+    const v = e.target.value.trim();
+    if(v){
+      homeroomClasses.push(v);
+      e.target.value = '';
+      renderTags();
+      saveHomeroom();
+    }
+  }
+});
+
+document.getElementById('clearHrBtn').addEventListener('click', ()=>{
+  if(!confirm('担任クラスの登録を全て消去します。よろしいですか？')) return;
+  homeroomClasses = [];
+  renderTags();
+  saveHomeroom();
+});
+
+/* ---------- image -> vision extraction ---------- */
+function fileToBase64(file){
+  return new Promise((resolve, reject)=>{
+    const r = new FileReader();
+    r.onload = () => resolve(r.result.split(',')[1]);
+    r.onerror = () => reject(new Error('ファイルの読み込みに失敗しました'));
+    r.readAsDataURL(file);
+  });
+}
+
+function setStatus(msg, kind){
+  const el = document.getElementById('analyzeStatus');
+  el.textContent = msg;
+  el.className = kind || '';
+}
+
+const VISION_PROMPT = `あなたは画像認識アシスタントです。添付画像は高校教員の個人授業時間割のスクリーンショットです。
+表は左端に時限番号（1,2,3…）の行、上部に曜日（月・火・水・木・金・土・日のいずれか表示されているもの）の列があります。
+各セルには0個以上の「担当クラス（HR名）」が含まれます。1セルに複数クラスが含まれる場合（合同授業・学年集会・講堂など）もあります。
+
+タスク：
+・各曜日×各時限のセルについて、そこに表示されているクラス名（HR名）だけを抽出してください。
+・クラス名の例：「高２－Ｈ」「3年A組」「Ｈ組」など、学年+組を示す文字列。
+・科目名（数学Ⅱ、英ＣⅠなど）は無視してください。
+・会議名など生徒のクラスを表していないセルは空配列にしてください。
+・1セルに複数クラスがある場合は全てを配列に含めてください。
+
+出力は下記の厳密なJSON形式のみとし、説明文やコードブロック記号は一切含めないでください：
+{"曜日":{"時限番号":["クラス名1","クラス名2"], ...}, ...}
+
+例：
+{"月":{"1":["高2-H"],"2":["高2-H"]},"金":{"1":["高1-K","高1-L","高1-M","高2-J","高2-K"]}}`;
+
+async function callVisionExtract(base64, mediaType){
+  const res = await fetch('https://api.anthropic.com/v1/messages', {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({
+      model:'claude-sonnet-4-6',
+      max_tokens: 2000,
+      messages:[{
+        role:'user',
+        content:[
+          {type:'image', source:{type:'base64', media_type: mediaType, data: base64}},
+          {type:'text', text: VISION_PROMPT}
+        ]
+      }]
+    })
+  });
+  if(!res.ok) throw new Error('APIエラー: ' + res.status);
+  const data = await res.json();
+  const textBlock = (data.content || []).find(b => b.type === 'text');
+  if(!textBlock) throw new Error('応答にテキストが含まれていません');
+  const clean = textBlock.text.replace(/```json|```/g, '').trim();
+  return JSON.parse(clean);
+}
+
+function mergeIntoTimetable(parsed){
+  Object.keys(parsed).forEach(wd=>{
+    if(!WEEKDAYS.includes(wd)) return;
+    if(!timetable[wd]) timetable[wd] = {};
+    Object.keys(parsed[wd]).forEach(p=>{
+      const arr = parsed[wd][p];
+      if(Array.isArray(arr) && arr.length){
+        timetable[wd][p] = arr.join(', ');
+        maxPeriod = Math.max(maxPeriod, parseInt(p, 10) || 0);
+      }
+    });
+  });
+}
+
+document.getElementById('analyzeBtn').addEventListener('click', async ()=>{
+  const files = document.getElementById('fileInput').files;
+  if(!files.length){ setStatus('画像を選択してください', 'warn'); return; }
+  setStatus(`解析中…（${files.length}枚）`, 'loading');
+  let ok = 0, fail = 0;
+  for(const file of files){
+    try{
+      const b64 = await fileToBase64(file);
+      const parsed = await callVisionExtract(b64, file.type || 'image/png');
+      mergeIntoTimetable(parsed);
+      ok++;
+    }catch(e){
+      console.error(e);
+      fail++;
+    }
+  }
+  renderGrid();
+  saveTimetable();
+  if(fail === 0){
+    setStatus(`✓ ${ok}枚を解析して反映しました。内容を確認・修正してください。`, 'ok');
+  }else{
+    setStatus(`${ok}枚成功、${fail}枚は解析に失敗しました。失敗分は表に直接入力してください。`, 'warn');
+  }
+});
+
+/* ---------- parsing pasted BLEND list ---------- */
+function toHalfWidth(str){
+  return str.replace(/[Ａ-Ｚａ-ｚ０-９]/g, ch => String.fromCharCode(ch.charCodeAt(0) - 0xFEE0));
+}
+
+function extractHRKeys(text){
+  const keys = new Set();
+  if(!text) return keys;
+  const s = toHalfWidth(text);
+  const re = /(\d{1,2})\s*[年－\-]?\s*([A-Za-z])(?:組)?/g;
+  let m;
+  while((m = re.exec(s)) !== null){
+    keys.add(m[1] + m[2].toUpperCase());
+  }
+  return keys;
+}
+
+function parseUnfilledText(text){
+  const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+  const linkRe = /^\[([^\]]+)\]\((https?:\/\/[^\)]+)\)$/;
+  const entries = [];
+  for(let i=0; i<lines.length; i++){
+    const m = lines[i].match(linkRe);
+    if(!m) continue;
+    const hrRaw = m[1];
+    const url = m[2];
+    const periodText = lines[i-1] || '';
+    const dateText = lines[i-2] || '';
+    const course = lines[i+1] || '';
+    const dm = url.match(/date=(\d{4})(\d{2})(\d{2})/);
+    let iso = null, weekday = null;
+    if(dm){
+      const y = +dm[1], mo = +dm[2], d = +dm[3];
+      const dateObj = new Date(y, mo-1, d);
+      iso = `${dm[1]}-${dm[2]}-${dm[3]}`;
+      weekday = WD_FROM_JSDAY[dateObj.getDay()];
+    }
+    const pm = periodText.match(/(\d+)\s*限/);
+    const periodNum = pm ? pm[1] : null;
+    entries.push({dateText, iso, weekday, periodText, periodNum, hrRaw, course, url});
+  }
+  return entries;
+}
+
+function checkEntries(entries){
+  const homeroomKeys = new Set();
+  homeroomClasses.forEach(raw => extractHRKeys(raw).forEach(k => homeroomKeys.add(k)));
+
+  return entries.map(e=>{
+    const entryKeys = extractHRKeys(e.hrRaw);
+    let isOwnClass = false;
+    if(e.weekday && e.periodNum && timetable[e.weekday] && timetable[e.weekday][e.periodNum]){
+      const cellKeys = extractHRKeys(timetable[e.weekday][e.periodNum]);
+      for(const k of entryKeys) if(cellKeys.has(k)) isOwnClass = true;
+    }
+    let isHomeroom = false;
+    for(const k of entryKeys) if(homeroomKeys.has(k)) isHomeroom = true;
+    return Object.assign({}, e, {isOwnClass, isHomeroom});
+  });
+}
+
+function sortEntries(list){
+  return list.slice().sort((a,b)=>{
+    const ai = a.iso || '9999-99-99', bi = b.iso || '9999-99-99';
+    if(ai !== bi) return ai < bi ? -1 : 1;
+    const ap = a.periodNum ? +a.periodNum : 99;
+    const bp = b.periodNum ? +b.periodNum : 99;
+    return ap - bp;
+  });
+}
+
+function formatDate(e){
+  if(!e.iso) return e.dateText || '(日付不明)';
+  const [y,mo,d] = e.iso.split('-').map(Number);
+  return `${mo}/${d}(${e.weekday || ''})`;
+}
+
+function renderList(list){
+  if(!list.length) return '<p class="empty">該当なし</p>';
+  return '<ul class="entry-list">' + sortEntries(list).map(e => `
+    <li>
+      <span class="date">${formatDate(e)}</span>
+      <span class="period">${escapeHtml(e.periodText)}</span>
+      <span class="hrname">${escapeHtml(e.hrRaw)}</span>
+      <span class="course">${escapeHtml(e.course)}</span>
+      ${(e.isOwnClass && e.isHomeroom) ? '<span class="badge-both">授業+担任</span>' : ''}
+      <a href="${escapeHtml(e.url)}" target="_blank" rel="noopener">BLENDで開く ↗</a>
+    </li>
+  `).join('') + '</ul>';
+}
+
+function renderResults(checked){
+  const own = checked.filter(e => e.isOwnClass);
+  const hr = checked.filter(e => e.isHomeroom);
+  const other = checked.filter(e => !e.isOwnClass && !e.isHomeroom);
+  const uniqueTotal = checked.length;
+
+  const html = `
+    <div class="summary">
+      <div class="box own"><div class="num">${own.length}</div><div class="label">自分の授業</div></div>
+      <div class="box hr"><div class="num">${hr.length}</div><div class="label">担任クラス</div></div>
+      <div class="box total"><div class="num">${uniqueTotal}</div><div class="label">貼り付けた件数（全体）</div></div>
+    </div>
+
+    <div class="list-section">
+      <h3><span class="dot own"></span>自分の授業の未入力（${own.length}件）</h3>
+      ${renderList(own)}
+    </div>
+
+    <div class="list-section">
+      <h3><span class="dot hr"></span>担任クラスの未入力（${hr.length}件）</h3>
+      ${renderList(hr)}
+    </div>
+
+    <details>
+      <summary>どちらにも該当しない項目を見る（${other.length}件）</summary>
+      ${renderList(other)}
+    </details>
+  `;
+  document.getElementById('results').innerHTML = html;
+}
+
+document.getElementById('checkBtn').addEventListener('click', ()=>{
+  const text = document.getElementById('pasteArea').value;
+  const entries = parseUnfilledText(text);
+  if(!entries.length){
+    document.getElementById('results').innerHTML =
+      '<p class="empty">リンク付きの項目が見つかりませんでした。BLENDからコピーした内容をそのまま貼り付けてください。</p>';
+    return;
+  }
+  const checked = checkEntries(entries);
+  renderResults(checked);
+});
+
+/* ---------- init ---------- */
+loadState();
+</script>
+
+</body>
+</html>
